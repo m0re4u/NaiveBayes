@@ -87,3 +87,14 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# data folders
+Week1/lower
+Week1/tokenized
+Week1/tokenizedMOT
+Week1/Create\ an\ Inverted\ Index\ as\ described\ in\ the\ IR\ book_files
+MOT*/
+TESTMOT*/
+shaks200*/
+KVR*/
+TEST*/
