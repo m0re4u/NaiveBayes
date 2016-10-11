@@ -52,7 +52,7 @@ def classFreq(directory):
 				"Ministerie voor Vreemdelingenzaken en Integratie",
 				"Ministerie van Landbouw, Natuur en Voedselkwaliteit",
 			  ]
-	classCount = [0] * 11
+	classCount = [0] * 16
 	for file in os.listdir(directory):
 		soup = BS(open(directory + '/' + file), "html.parser")
 		docClass = soup.findAll("item", {"attribuut" : "Afkomstig_van"})[0].get_text()

@@ -8,6 +8,7 @@ import jellyfish
 import os
 from bs4 import BeautifulSoup as BS
 import unicodedata
+import io
 
 def main():
 	directory = '../TESTKVR'
@@ -35,7 +36,7 @@ def main():
 
 	for file in os.listdir(directory):
 		try:
-			soup = BS(open(directory + '/' + file), "html.parser")
+			soup = BS(open(directory + '/' + file), "lxml")
 		except UnicodeDecodeError:
 			print("File could not be parsed, continuing")
 		ministryTagList = soup.findAll("item", {"attribuut" : "Afkomstig_van"})
@@ -46,6 +47,9 @@ def main():
 
 		bestMinistry = getBestMatch(ministryTag, ministryList)
 		ministryTagList[0].contents[0].replaceWith(bestMinistry)
+		# print("==========================")
+		# print("found tag: " + ministryTag)
+		# print("matched with: " + bestMinistry)
 
 		xml = soup.prettify("utf-8")
 		with open(directory + "+/" + file, "wb") as f:
@@ -61,15 +65,15 @@ def getBestMatch(foundMinistry, ministryList):
 	for i, ministry in enumerate(ministryList):
 		# first see if there are direct similar words in the titles if there is
 		# choose that ministry and stop
-		ministry = str(ministry.encode('utf-8').decode('ascii', 'ignore'))
-		foundMinistry = str(foundMinistry.encode('utf-8').decode('ascii', 'ignore'))
 		ministry = ministry.lower()
 		foundMinistry = foundMinistry.lower()
 
+		ministry = ministry.replace("ë", "e")
 		ministry = ministry.replace(" en ", "")
 		ministry = ministry.replace("zaken", " ")
 		ministry = ministry.replace("ministerie van ", "")
 		ministry = ministry.replace("ministerie voor ", "")
+		foundMinistry = foundMinistry.replace("ë", "e")
 		foundMinistry = foundMinistry.replace(" en ", "")
 		foundMinistry = foundMinistry.replace("zaken", "")
 		foundMinistry = foundMinistry.replace("ministerie van ", "")
@@ -77,7 +81,9 @@ def getBestMatch(foundMinistry, ministryList):
 
 		tokens = foundMinistry.split()
 		for token in tokens:
-			if token in ministry:
+			# nasty hack, removing the last 3 solves a problem with reading financien wrongly
+			# the ministries will still match correctly even after removing 3 characters :)
+			if token[:-3] in ministry:
 				return ministryList[i]
 
 		# if no ministry is found use string similarity score
