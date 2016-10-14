@@ -1,19 +1,22 @@
-	# Made in Python 3.4
-	# Search engines 2016
-	# created on 11-10-2016
-	# Michiel van der Meer  -  michielmeer@live.nl        -  10749810
-	# Jonathan Gerbscheid   -  jonathan-gerb@hotmail.com  -  10787852
-	# Thomas Groot          -  thomas--g@hotmail.com      -  10658017
-import os
+# Made in Python 3.4
+# Search engines 2016
+# created on 11-10-2016
+# Michiel van der Meer  -  michielmeer@live.nl        -  10749810
+# Jonathan Gerbscheid   -  jonathan-gerb@hotmail.com  -  10787852
+# Thomas Groot          -  thomas--g@hotmail.com      -  10658017
 import jellyfish
+import os
 from bs4 import BeautifulSoup as BS
 import unicodedata
 import io
+import numpy as np
+from sets import Set
 
 def main():
+	data = {}
 	directory = '../TESTKVR'
 	# list of accepted ministries
-	ministryList = ["Ministerie van Algemene Zaken",
+	classes = ["Ministerie van Algemene Zaken",
 					"Ministerie van Binnenlandse Zaken en Konkrijksrelaties",
 					"Ministerie van Buitenlandse Zaken",
 					"Ministerie van Defensie",
@@ -45,24 +48,62 @@ def main():
 		else: 
 			continue
 
-		bestMinistry = getBestMatch(ministryTag, ministryList)
-		ministryTagList[0].contents[0].replaceWith(bestMinistry)
+		bestMinistry = getBestMatch(ministryTag, classes)
+		# ministryTagList[0].contents[0].replaceWith(bestMinistry)
 		# print("==========================")
 		# print("found tag: " + ministryTag)
 		# print("matched with: " + bestMinistry)
+		# print(file)
+		bib = ""
+		inhoud = ""
+		trefwoorden = ""
+		vragen = ""
+		antwoorden = ""
+		rubriek = ""
+		try:
+			bib = soup.findAll("item", {"attribuut" : "Bibliografische_omschrijving"})[0].get_text()
+			inhoud = soup.findAll("item", {"attribuut" : "Inhoud"})[0].get_text()
+			trefwoorden = soup.findAll("item", {"attribuut" : "Trefwoorden"})[0].get_text()
+			vragen = soup.vragen.get_text()
+			antwoorden = soup.antwoorden.get_text()
+			rubriek = soup.findAll("item", {"attribuut" : "Rubriek"})[0].get_text()
+		except IndexError:
+			pass
+		data[file] = [bestMinistry, bib, inhoud, trefwoorden, vragen, antwoorden, rubriek]
+		# xml = soup.prettify("utf-8")
+		# with open(directory + "+/" + file, "wb") as f:
+		# 	f.write(xml)
+	classCount = classFreqCounter(data, classes)
+	priorProbs = np.array(classCount)
+	totalFiles = len(os.listdir(directory))
+	priorProbs = np.divide(priorProbs, totalFiles)
+	print(priorProbs)
+	# print(data.values())
+	for value in data.values():
+		set(value)
 
-		xml = soup.prettify("utf-8")
-		with open(directory + "+/" + file, "wb") as f:
-			f.write(xml)
 
 
-def getBestMatch(foundMinistry, ministryList):
+
+def classFreqCounter(data, classes):
+	classCounts = [0] * 16
+	print(data.keys())
+	for key in data.keys():
+		for i, classy in enumerate(classes):
+			if classy == data[key][0]:
+				classCounts[i] += 1
+	return classCounts
+
+
+
+
+def getBestMatch(foundMinistry, classes):
 	"""
-	Get most similar to foundMinistry option from ministryList by checking for occurence of tokens, otherwise uses string similarity 
+	Get most similar to foundMinistry option from classes by checking for occurence of tokens, otherwise uses string similarity 
 	"""
 	maxScore = [0,0] # [score, index]
 
-	for i, ministry in enumerate(ministryList):
+	for i, ministry in enumerate(classes):
 		# first see if there are direct similar words in the titles if there is
 		# choose that ministry and stop
 		ministry = ministry.lower()
@@ -84,14 +125,14 @@ def getBestMatch(foundMinistry, ministryList):
 			# nasty hack, removing the last 3 solves a problem with reading financien wrongly
 			# the ministries will still match correctly even after removing 3 characters :)
 			if token[:-3] in ministry:
-				return ministryList[i]
+				return classes[i]
 
 		# if no ministry is found use string similarity score
-		score = jellyfish.levenshtein_distance(foundMinistry, ministryList[i])
+		score = jellyfish.levenshtein_distance(foundMinistry, classes[i])
 		if score > maxScore[0]:
 			maxScore[0] = score
 			maxScore[1] = i
-	return ministryList[maxScore[1]]
+	return classes[maxScore[1]]
 
 
 if __name__ == '__main__':

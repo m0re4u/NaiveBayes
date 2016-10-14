@@ -13,11 +13,37 @@ from collections import Counter
 from bs4 import BeautifulSoup as BS
 
 def main():
+	classes = ["Ministerie van Algemene Zaken",
+				"Ministerie van Binnenlandse Zaken en Konkrijksrelaties",
+				"Ministerie van Buitenlandse Zaken",
+				"Ministerie van Defensie",
+				"Ministerie van Economische Zaken",
+				"Ministerie van Financiën",
+				"Ministerie van Infrastructuur en Milieu",
+				"Ministerie van Onderwijs, Cultuur en Wetenschap",
+				"Ministerie van Sociale Zaken en Werkgelegenheid",
+				"Ministerie van Veiligheid en Justitie",
+				"Ministerie van Volksgezondheid, Welzijn en Sport",
+				"Ministerie van Economische Zaken, Landbouw en Innovatie",
+				"Ministerie van Verkeer en Waterstaat",
+				"Ministerie van Volkshuisvesting, Ruimtelijke Ordening en Milieubeheer",
+				"Ministerie voor Vreemdelingenzaken en Integratie",
+				"Ministerie van Landbouw, Natuur en Voedselkwaliteit",
+			  ]
+
 	# directory = '../shaks200'
 	directory = '../TESTKVR+'
 	# tokenizeFiles(directory)
 	# createTokenDict(directory)
-	classFreq(directory)
+	classCount = classFreq(directory, classes)
+	priorProbs = np.array(classCount)
+	totalFiles = len(os.listdir(directory))
+	priorProbs = np.divide(priorProbs, totalFiles)
+	# print("=========================")
+	# for i, classy in enumerate(classes):
+	# 	print(classy + ": " + str(priorProbs[i]))
+
+
 
 
 def tokenizeFiles(directory):
@@ -32,29 +58,13 @@ def tokenizeFiles(directory):
 			# remove trailing non word characters and empty lines
 			text = re.sub('(\W+\\n)', '\n', text)
 			f.write(text)
+	print("tokenized files.")
 
 
-def classFreq(directory):
-	classes = ["Ministerie van Algemene Zaken",
-				"Ministerie van Binnenlandse Zaken en Konkrijksrelaties",
-				"Ministerie van Buitenlandse Zaken",
-				"Ministerie van Defensie",
-				"Ministerie van Economische Zaken",
-				"Ministerie van Financien",
-				"Ministerie van Infrastructuur en Milieu",
-				"Ministerie van Onderwijs, Cultuur en Wetenschap",
-				"Ministerie van Sociale Zaken en Werkgelegenheid",
-				"Ministerie van Veiligheid en Justitie",
-				"Ministerie van Volksgezondheid, Welzijn en Sport",
-				"Ministerie van Economische Zaken, Landbouw en Innovatie",
-				"Ministerie van Verkeer en Waterstaat",
-				"Ministerie van Volkshuisvesting, Ruimtelijke Ordening en Milieubeheer",
-				"Ministerie voor Vreemdelingenzaken en Integratie",
-				"Ministerie van Landbouw, Natuur en Voedselkwaliteit",
-			  ]
+def classFreq(directory, classes):
 	classCount = [0] * 16
 	for file in os.listdir(directory):
-		soup = BS(open(directory + '/' + file), "html.parser")
+		soup = BS(open(directory + '/' + file), "lxml")
 		docClass = soup.findAll("item", {"attribuut" : "Afkomstig_van"})[0].get_text()
 		# print(docClass)
 		for i, classy in enumerate(classes):
@@ -67,6 +77,7 @@ def classFreq(directory):
 	print("=========================")
 	for i, classy in enumerate(classes):
 		print(classy + ": " + str(classCount[i]))
+	return classCount
 
 
 def createTokenDict(directory):
