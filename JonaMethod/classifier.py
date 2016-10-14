@@ -11,7 +11,7 @@ import nltk
 from bs4 import BeautifulSoup as BS
 
 TRAINEDDATA = 'trained_data'
-DIRECTORY = '../TESTKVR+'
+DIRECTORY = '../KVR_TEST'
 CLASSES = ["Ministerie van Algemene Zaken",
             "Ministerie van Binnenlandse Zaken en Konkrijksrelaties",
             "Ministerie van Buitenlandse Zaken",

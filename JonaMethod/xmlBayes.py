@@ -14,12 +14,14 @@ from collections import Set
 import nltk
 from collections import Counter
 import pickle
+import sys
+import time
 
 CLASSSMOOTHING = 0
 
 def main():
     data = {}
-    directory = '../TESTKVR'
+    directory = '../KVR_TRAIN'
     # list of accepted ministries
     classes =  ["Ministerie van Algemene Zaken",
                 "Ministerie van Binnenlandse Zaken en Konkrijksrelaties",
@@ -39,14 +41,16 @@ def main():
                 "Ministerie van Landbouw, Natuur en Voedselkwaliteit",
                ]
 
-    if not os.path.exists(directory + "+"):
-        os.mkdir(directory + "+")
-
+    p = 0
     for file in os.listdir(directory):
+        p += 1
+        sys.stdout.flush()
+        sys.stdout.write("\r{0}".format("files read: " + str(p)))
+        # print("files processed: " + str(p))
         try:
             soup = BS(open(directory + '/' + file), "lxml")
         except UnicodeDecodeError:
-            print("File: " + str(file) + " could not be parsed, continuing")
+            print("\nFile: " + str(file) + " could not be parsed, continuing")
         ministryTagList = soup.findAll("item", {"attribuut" : "Afkomstig_van"})
         if len(ministryTagList) > 0:
             ministryTag = ministryTagList[0].get_text()
@@ -62,7 +66,7 @@ def main():
         try:
             bib = soup.findAll("item", {"attribuut" : "Bibliografische_omschrijving"})[0].get_text()
         except IndexError:
-            print("skipped biblio")
+            # print("skipped biblio")
             pass
         try:
             inhoud = soup.findAll("item", {"attribuut" : "Inhoud"})[0].get_text()
@@ -72,35 +76,42 @@ def main():
         try:
             trefwoorden = soup.findAll("item", {"attribuut" : "Trefwoorden"})[0].get_text()
         except IndexError:
-            print("skipped trefwoorden")
+            # print("skipped trefwoorden")
             pass
         try:
             vragen = soup.vragen.get_text()
         except IndexError:
-            print("skipped vragen")
+            # print("skipped vragen")
             pass
         try:
             antwoorden = soup.antwoorden.get_text()
         except IndexError:
-            print("skipped antwoorden")
+            # print("skipped antwoorden")
             pass
         try:
             rubriek = soup.findAll("item", {"attribuut" : "Rubriek"})[0].get_text()
         except IndexError:
-            print("skipped rubriek")
+            # print("skipped rubriek")
             pass
         
         data[file] = [bestMinistry, bib, inhoud, trefwoorden, vragen, antwoorden, rubriek]
 
     classCount = classFreqCounter(data, classes)
+    print("Calculated frequencies for all classes.")
     totalFiles = len(os.listdir(directory)) + CLASSSMOOTHING
     priorProbs = np.divide(np.array(classCount), totalFiles)
+    print("Calculated prior probabilities for all classes.")
     classStrings = getclassStrings(data, classes)
+    print("Concatenated files for all classes.")
     vocabulary = getVocabulary(classStrings)
+    print("Processed vocabulary.")
     tokenClassCounts = getTokenClassCounts(vocabulary, classStrings)
+    print("Calculated class counts for all tokens.")
     conditionalProbs = getConProb(tokenClassCounts, vocabulary, classes)
+    print("Calculated conditional probabilities.")
     with open('trained_data.pik', 'wb') as f:
         pickle.dump([vocabulary, priorProbs, conditionalProbs], f, -1)
+        print("wrote data to trained_data.pik.")
 
 
 def getConProb(tct, vocabulary, classes):
