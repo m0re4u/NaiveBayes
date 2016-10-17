@@ -2,13 +2,15 @@ import pickle
 import argparse
 import numpy as np
 import normalize as nm
+from sys import stdout
+from collections import Counter
 from nltk.tokenize import word_tokenize
 
 
 def train(pdata):
     print("Started training..")
     # Extract vocabulary
-    V = get_text(pdata)
+    V = get_text(pdata, True)
     # Number of docs
     N = len(pdata.index)
     # Dict of prior probabilities
@@ -22,24 +24,41 @@ def train(pdata):
         N_c = len(cdata.index)
         prior[mclass] = N_c / N
         text_c = get_text(cdata)
+        counts = Counter(text_c)
         for i, word in enumerate(V):
+            # i+1: on the last iteration the print is not updated
+            stdout.write("\r%d / %d" % (i+1, len(V)))
+            stdout.flush
             if word not in condprob:
                 condprob[word] = {}
-            T_ct = text_c.count(word)
+            T_ct = counts[word]
             condprob[word][mclass] = (T_ct + 1) / len(text_c)
+        stdout.write("\n")
 
     saveData(V, prior, condprob)
     return V, prior, condprob
 
 
-def apply(V, prior, condprob, pdata, newdoc):
+def test(prior, condprob, pdata, test_data):
+    correct = 0
+    for i, row in enumerate(test_data.iterrows()):
+        scores = apply(prior, condprob, pdata, row[1])
+        winner = max(scores, key=scores.get)
+        print("{} versus {}".format(winner, row[1]['ministerie']))
+        if winner == row[1]['ministerie']:
+            correct += 1
+        print("{} / {} ".format(correct, (i+1)))
+    # print(correct)
+
+
+def apply(prior, condprob, pdata, newdoc):
     W = get_text(newdoc)
     score = {}
     for mclass in pdata['ministerie'].unique():
-        score[mclass] = np.log(prior[mclass])
+        score[mclass] = np.log10(prior[mclass])
         for word in W:
             if word in condprob.keys():
-                score[mclass] += np.log(condprob[word][mclass])
+                score[mclass] += np.log10(condprob[word][mclass])
             else:
                 # Skip words that we have not encountered before.
                 continue
@@ -52,10 +71,12 @@ def saveData(V, prior, condprob):
         print("!! Wrote training data to trained_data.pik.")
 
 
-def get_text(pdata):
+def get_text(pdata, unique=False):
     voc = accum_words('titel', pdata)
     voc.extend(accum_words('vraag', pdata))
     voc.extend(accum_words('antwoord', pdata))
+    if unique is True:
+        voc = set(voc)
     return voc
 
 
@@ -68,20 +89,25 @@ def accum_words(name, pdata):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('data', help='data folder for KVR')
+    parser.add_argument('data', help='data folder for KVR.csv.gz')
+    parser.add_argument('test_per', help='test data folder for KVR',
+                        type=float)
     parser.add_argument('--load', help='load data from pickle file',
                         metavar='file', nargs=1)
     args = parser.parse_args()
     print(args)
+    # normalize ministeries
     data = nm.normalize_min(args.data)
+    cutoff = round(len(data.index)*args.test_per)
+    train_data, test_data = data[:cutoff], data[cutoff:]
     if args.load is not None:
         with open(args.load[0], 'rb') as f:
             V, prior, condprob = pickle.load(f)
     else:
-        V, prior, condprob = train(data)
+        V, prior, condprob = train(train_data)
 
-    scores = apply(V, prior, condprob, data.iloc[:-1], data.iloc[-1])
+    pr, re, f1 = test(prior, condprob, data, test_data)
     print("-------------------")
     print(data.iloc[-1])
-    print(max(scores))
-    print(max(scores, key=scores.get))
+    print(scores)
+    print()
