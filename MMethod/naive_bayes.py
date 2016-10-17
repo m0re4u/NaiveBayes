@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import normalize as nm
 from sys import stdout
-from collections import Counter
+from collections import Counter, defaultdict
 from nltk.tokenize import word_tokenize
 
 
@@ -17,6 +17,8 @@ def train(pdata):
     prior = {}
     # Dict of conditional probabilities
     condprob = {}
+    # Count dict of class-words
+    count_dict = {}
 
     for mclass in pdata['ministerie'].unique():
         print("Training {}".format(mclass))
@@ -25,6 +27,7 @@ def train(pdata):
         prior[mclass] = N_c / N
         text_c = get_text(cdata)
         counts = Counter(text_c)
+        count_dict[mclass] = counts
         for i, word in enumerate(V):
             # i+1: on the last iteration the print is not updated
             stdout.write("\r%d / %d" % (i+1, len(V)))
@@ -35,8 +38,8 @@ def train(pdata):
             condprob[word][mclass] = (T_ct + 1) / len(text_c)
         stdout.write("\n")
 
-    saveData(V, prior, condprob)
-    return V, prior, condprob
+    saveData(count_dict, prior, condprob)
+    return count_dict, prior, condprob
 
 
 def test(prior, condprob, pdata, test_data):
@@ -48,11 +51,15 @@ def test(prior, condprob, pdata, test_data):
         if winner == row[1]['ministerie']:
             correct += 1
         print("{} / {} ".format(correct, (i+1)))
-    # print(correct)
+
+    pre = correct / i
+    rec = correct / i
+    f1 = 2 * pre * rec / pre + rec
+    return pre, rec, f1
 
 
 def apply(prior, condprob, pdata, newdoc):
-    W = get_text(newdoc)
+    W = get_single_text(newdoc)
     score = {}
     for mclass in pdata['ministerie'].unique():
         score[mclass] = np.log10(prior[mclass])
@@ -71,6 +78,13 @@ def saveData(V, prior, condprob):
         print("!! Wrote training data to trained_data.pik.")
 
 
+def get_single_text(pdata):
+    voc = word_tokenize(pdata['titel'])
+    voc.extend(word_tokenize(pdata['vraag']))
+    voc.extend(word_tokenize(pdata['antwoord']))
+    return voc
+
+
 def get_text(pdata, unique=False):
     voc = accum_words('titel', pdata)
     voc.extend(accum_words('vraag', pdata))
@@ -85,6 +99,21 @@ def accum_words(name, pdata):
     for sentence in pdata[name]:
         wordlist.extend(word_tokenize(sentence))
     return wordlist
+
+
+def mutual_info(count_dict, term, mclass):
+    inv_prob = {}
+    for word, classdict in condprob.items():
+        for mclass, prob in classdict.items():
+            if mclass not in inv_prob:
+                inv_prob[mclass] = {}
+            inv_prob[mclass][word] = prob
+            print(wordict)
+    for mclass, wordict in inv_prob.items():
+        top = sorted(wordict, key=wordict.get, reverse=True)
+        print(top)
+
+    return inv_prob
 
 
 if __name__ == '__main__':
@@ -102,12 +131,13 @@ if __name__ == '__main__':
     train_data, test_data = data[:cutoff], data[cutoff:]
     if args.load is not None:
         with open(args.load[0], 'rb') as f:
-            V, prior, condprob = pickle.load(f)
+            count_dict, prior, condprob = pickle.load(f)
     else:
-        V, prior, condprob = train(train_data)
+        count_dict, prior, condprob = train(train_data)
 
     pr, re, f1 = test(prior, condprob, data, test_data)
     print("-------------------")
-    print(data.iloc[-1])
-    print(scores)
-    print()
+    print(pr)
+    print(re)
+    print(f1)
+    print("-------------------")
