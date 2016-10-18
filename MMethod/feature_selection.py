@@ -1,7 +1,8 @@
 import numpy as np
-from nltk import word_tokenize
 from sys import stdout
+from nltk import word_tokenize
 from naive_bayes import get_text
+from collections import Counter, defaultdict
 
 
 def select_features(V, pdata, mclass, k):
@@ -12,6 +13,8 @@ def select_features(V, pdata, mclass, k):
     ndata = pdata[~(pdata['ministerie'] == mclass)]
     mtext = get_text(mdata)
     ntext = get_text(ndata)
+    mCounter = Counter(mtext)
+    nCounter = Counter(ntext)
 
     for i, term in enumerate(V):
         stdout.write("\r%d / %d" % (i+1, len(V)))
@@ -22,42 +25,30 @@ def select_features(V, pdata, mclass, k):
     return sorted(A, key=A.__getitem__)[:k]
 
 
-def get_utility(mdata, ndata, term, mclass):
+def get_utility(mCounter, nCounter, term, mclass):
     # All documents
-    N = len(mdata.index) + len(ndata.index)
+    N = sum(mCounter.values().extend(nCounter.values()))
 
     # Number of documents where term is in the document, but document not in
     # class
-    if (term in ndata['titel']) or (term in ndata['vraag']) or (term in ndata['antwoord']):
-        print("found non-null")
-        sdata = ndata[(term in ndata['titel']) | (term in ndata['vraag']) | (term in ndata['antwoord'])]
-        print("qdata: {}".format(sdata))
-        N10 = len(sdata.index)
+    if term in nCounter:
+        N10 = nCounter[term]
     else:
         N10 = 0
 
     # Number of documents where term is in the document and document is in
     # class
-    if (term in mdata['titel']) or (term in mdata['vraag']) or (term in mdata['antwoord']):
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!found non-null")
-        tdata = mdata[(term in mdata['titel']) | (term in mdata['vraag']) | (term in mdata['antwoord'])]
-        # print("tdata: {}".format(tdata))
-        N11 = len(tdata.index)
+    if term in nCounter:
+        N11 = mCounter[term]
     else:
         N11 = 0
 
     # Number of documents where term not in document, and document is not in
     # class
-    if (term not in ndata['titel']) and (term not in ndata['vraag']) and (term not in ndata['antwoord']):
-        N00 = len(ndata.index)
-    else:
-        N00 = 0
+    N00 = N - len(nCounter.keys())
 
     # Number of documents where term not in document, but document is in class
-    if (term not in mdata['titel']) and (term not in mdata['vraag']) and (term not in mdata['antwoord']):
-        N01 = len(mdata.index)
-    else:
-        N01 = 0
+    N01 = N - len(mCounter.keys())
 
     a, b, c, d = (0, 0, 0, 0)
     if N11 != 0:

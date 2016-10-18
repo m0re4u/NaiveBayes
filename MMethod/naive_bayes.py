@@ -42,20 +42,47 @@ def train(pdata):
 
 def test(prior, condprob, pdata, test_data):
     correct = 0
-    FP, TP, FN, TN = (0,0,0,0)
+    res_dict = {}
     for i, row in enumerate(test_data.iterrows()):
         scores = apply(prior, condprob, pdata, row[1])
         winner = max(scores, key=scores.get)
         print("{} versus {}".format(winner, row[1]['ministerie']))
+        # Handle Recall/Precision
+        if winner not in res_dict:
+            res_dict[winner] = {}
+        if row[1]['ministerie'] not in res_dict:
+            res_dict[row[1]['ministerie']] = {}
+
+        # If correctly assigned
         if winner == row[1]['ministerie']:
             correct += 1
+            if 'TP' not in res_dict[winner]:
+                res_dict[winner]['TP'] = 0
+                print(winner)
+            res_dict[winner]['TP'] += 1
+        else:
+            if 'FN' not in res_dict[row[1]['ministerie']]:
+                res_dict[row[1]['ministerie']]['FN'] = 0
+            if 'FN' not in res_dict[winner]:
+                res_dict[winner]['FN'] = 0
+            if 'FP' not in res_dict[row[1]['ministerie']]:
+                res_dict[row[1]['ministerie']]['FP'] = 0
+            if 'FP' not in res_dict[winner]:
+                res_dict[winner]['FP'] = 0
+            res_dict[row[1]['ministerie']]['FN'] += 1
+            res_dict[winner]['FP'] += 1
 
         print("{} / {} ".format(correct, (i+1)))
 
-    pre = correct / i
-    rec = correct / i
-    f1 = 2 * pre * rec / pre + rec
-    return pre, rec, f1
+    print(res_dict)
+    # save results
+    for mclass in pdata['ministerie'].unique():
+        pre = res_dict[mclass]['TP'] / res_dict[mclass]['TP'] + res_dict[mclass]['FP']
+        rec = res_dict[mclass]['TP'] / res_dict[mclass]['TP'] + res_dict[mclass]['FN']
+        res_dict[mclass]['pre'] = pre
+        res_dict[mclass]['rec'] = rec
+        res_dict[mclass]['f1'] = 2 * pre * rec / pre + rec
+    return res_dict
 
 
 def apply(prior, condprob, pdata, newdoc):
@@ -112,19 +139,19 @@ if __name__ == '__main__':
     print(args)
     # normalize ministeries
     data = nm.normalize_min(args.data)
+    # split data
     cutoff = round(len(data.index)*args.test_per)
     train_data, test_data = data[:cutoff], data[cutoff:]
+    # Load in pretrained pickle or train the data
     if args.load is not None:
         with open(args.load[0], 'rb') as f:
             V, prior, condprob = pickle.load(f)
     else:
         V, prior, condprob = train(train_data)
 
-    pr, re, f1 = test(prior, condprob, data, test_data)
+    res_dict = test(prior, condprob, data, test_data)
     print("-------------------")
-    print(pr)
-    print(re)
-    print(f1)
+    print(res_dict)
     print("-------------------")
     print("Selecting features..")
     print(fs.get_top(V, train_data, 10))
