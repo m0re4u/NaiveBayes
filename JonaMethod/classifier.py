@@ -9,6 +9,9 @@ import math
 import os
 import nltk
 from bs4 import BeautifulSoup as BS
+from collections import Counter
+import sys
+import time
 
 TRAINEDDATA = 'trained_data'
 DIRECTORY = '../KVR_TEST'
@@ -34,10 +37,12 @@ CLASSES = ["Ministerie van Algemene Zaken",
 def main():
     totalClassified = 0
     correctClassified = 0
-    voc, priorProbs, condProbs = readData(TRAINEDDATA)
+    voc, priorProbs, condProbs, wordAppearsIn, filesInClass, parsedFiles = readData(TRAINEDDATA)
     filenames = os.listdir(DIRECTORY)
     for file in filenames:
-        print("======================")
+        # print("======================")
+        sys.stdout.flush()
+        sys.stdout.write("\r{0}".format("files classified: " + str(totalClassified)))
         documentTokens, correctMinistry = readDocument(file)
         if documentTokens == "not readable":
             continue
@@ -46,14 +51,91 @@ def main():
                 documentTokens.remove(word)
         # print(documentTokens)
         classScores = scoreDocument(documentTokens, priorProbs, condProbs)
-        print("geclassificeerd als: " + str(CLASSES[classScores.index(max(classScores))]))
+        # print("geclassificeerd als: " + str(CLASSES[classScores.index(max(classScores))]))
         if correctMinistry == CLASSES[classScores.index(max(classScores))]:
             correctClassified += 1
         totalClassified += 1
-    print("accuracy: " + str(correctClassified/totalClassified))
+    # =======================
+    # The following part is commented because it is excruciatingly slow and mostely untested.
+    # =======================
+
+    # mutualProbs = {}
+    # county = 0
+    # print(len(voc))
+    # for word in voc:
+    #     sys.stdout.write("\r{0}".format("Words done: " + str(county)))
+    #     sys.stdout.flush()
+    #     county += 1
+    #     mutualProbs[word] = [0] * 16
+    #     for i in range(16):
+    #         mutualProbs[word][i] = getMutualInformation(word, wordAppearsIn, filesInClass, parsedFiles, i)
+
+
+    print("Finished with classification!")
+    print("=============================")
+    # print()
+    list1 = []
+    print("meest informatieve woorden voor: " + CLASSES[0] + ": ")
+    county = 0
+    for key, value in mutualProbs.keys():
+        print("keys done: "+ str(county))
+        county += 1
+        list1.append((key, value[0]))
+    sortedlist = sorted(list1, key=lambda tup:tup[1])
+    print(sortedlist[:10])
+    print("=============================")
+    # print("accuracy: " + str(correctClassified/totalClassified))
+    print("True positives: " + str(correctClassified))
+    print("")
+
+def getMutualInformation(term, wordAppearsIn, filesInClass, parsedFiles,classy):
+    """
+    classy is a number from 0 o 15
+    """
+    if term in wordAppearsIn:
+        filesPos = wordAppearsIn[term]
+    else:
+        return 0
+    classFiles = filesInClass[CLASSES[classy]]
+    N = len(parsedFiles)
+    N11 = len([x for x in filesPos if x in classFiles and x in filesPos])
+    N10 = len([x for x in filesPos if x not in classFiles])
+    N01 = len([x for x in classFiles if x not in filesPos])
+    N00 = N - N11 - N10 - N01
+    # print("N11: " + str(N11))
+    # print("N10: " + str(N10))
+    # print("N01: " + str(N01))
+    # print("N00: " + str(N00))
+    # print("N: " + str(N))
+    IUC = 0
+    try:
+        if N11 == 0:
+            A = 0
+        else:
+            A = N11/N * math.log2((N * N11)/((N11 + N10) * (N11 + N01)))
+        if N01 == 0:
+            B = 0
+        else:
+            B = N01/N * math.log2((N * N01)/((N01 + N00) * (N11 + N01)))
+        if N10 == 0:
+            C = 0
+        else:
+            C = N10/N * math.log2((N * N10)/((N11 + N10) * (N10 + N00)))
+        if N00 == 0:
+            D = 0
+        else:
+            D = N00/N * math.log2((N * N00)/((N01 + N00) * (N10 + N00)))
+        IUC = A + B + C + D
+    except:
+        return 0
+    return IUC
 
 
 def readDocument(filename):
+    """
+    Reads and tokenizes a files structured as a kamervraag, returns both the tokens
+    retrieved from the file and the correct class.
+    """
     try:
         soup = BS(open(DIRECTORY + '/' + filename), "lxml")
     except UnicodeDecodeError:
@@ -64,9 +146,9 @@ def readDocument(filename):
     if len(ministryTagList) > 0:
         ministry = ministryTagList[0].get_text()
         ministry = ministry[6:-5]
-        print("correcte ministerie: " + ministry)
-    else:
-        print("geen ministerie gevonden")
+        # print("correcte ministerie: " + ministry)
+    # else:
+        # print("geen ministerie gevonden")
     bib = ""
     inhoud = ""
     trefwoorden = ""
@@ -103,28 +185,13 @@ def readDocument(filename):
     except IndexError:
         print("skipped rubriek")
         pass
-    # try:
-    #     inhoud = soup.findAll("item", {"attribuut" : "Inhoud"})[0].get_text()
-    # except IndexError:
-    #     # inhoud is regularly absent from data
-    #     pass
-    # try:
-    #     bib = soup.findAll("item", {"attribuut" : "Bibliografische_omschrijving"})[0].get_text()
-    #     trefwoorden = soup.findAll("item", {"attribuut" : "Trefwoorden"})[0].get_text()
-    #     vragen = soup.vragen.get_text()
-    #     antwoorden = soup.antwoorden.get_text()
-    #     rubriek = soup.findAll("item", {"attribuut" : "Rubriek"})[0].get_text()
-    # except IndexError:
-    #     print("something went wrong while parsing File: " + str(filename) + ", continuing")
-    #     pass
-    
     filestring = ''.join([ministry, bib, inhoud, trefwoorden, vragen, antwoorden, rubriek])
     return nltk.word_tokenize(filestring), ministry
 
 def readData(TRAINEDDATA):
     with open('trained_data.pik', 'rb') as f:
-        voc, priorProbs, condProbs = pickle.load(f)
-    return voc, priorProbs, condProbs
+        voc, priorProbs, condProbs, wordAppearsIn, filesInClass, parsedFiles = pickle.load(f)
+    return voc, priorProbs, condProbs, wordAppearsIn, filesInClass, parsedFiles
 
 
 def scoreDocument(tokens, priorProbs, condProbs):

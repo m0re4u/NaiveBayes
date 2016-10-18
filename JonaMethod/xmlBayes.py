@@ -21,6 +21,9 @@ CLASSSMOOTHING = 0
 
 def main():
     data = {}
+    wordAppearsIn = {}
+    filesInClass = {}
+    parsedFiles = []
     directory = '../KVR_TRAIN'
     # list of accepted ministries
     classes =  ["Ministerie van Algemene Zaken",
@@ -41,11 +44,14 @@ def main():
                 "Ministerie van Landbouw, Natuur en Voedselkwaliteit",
                ]
 
+    for classy in classes:
+        filesInClass[classy] = []
+
     p = 0
     for file in os.listdir(directory):
         p += 1
         sys.stdout.flush()
-        sys.stdout.write("\r{0}".format("files read: " + str(p)))
+        sys.stdout.write("\r{0}".format("Files read: " + str(p)))
         # print("files processed: " + str(p))
         try:
             soup = BS(open(directory + '/' + file), "lxml")
@@ -57,6 +63,9 @@ def main():
         else: 
             continue
         bestMinistry = getBestMatch(ministryTag, classes)
+        filesInClass[bestMinistry].append(str(file))
+        parsedFiles.append(str(file))
+
         bib = ""
         inhoud = ""
         trefwoorden = ""
@@ -65,31 +74,67 @@ def main():
         rubriek = ""
         try:
             bib = soup.findAll("item", {"attribuut" : "Bibliografische_omschrijving"})[0].get_text()
+            tokens = nltk.word_tokenize(bib)
+            for token in tokens:
+                if token in wordAppearsIn:
+                    wordAppearsIn[token].append(str(file))
+                else:
+                    wordAppearsIn[token] = [str(file)]
         except IndexError:
             # print("skipped biblio")
             pass
         try:
             inhoud = soup.findAll("item", {"attribuut" : "Inhoud"})[0].get_text()
+            tokens = nltk.word_tokenize(inhoud)
+            for token in tokens:
+                if token in wordAppearsIn:
+                    wordAppearsIn[token].append(str(file))
+                else:
+                    wordAppearsIn[token] = [str(file)]
         except IndexError:
             # print("skipped inhoud")
             pass
         try:
             trefwoorden = soup.findAll("item", {"attribuut" : "Trefwoorden"})[0].get_text()
+            tokens = nltk.word_tokenize(trefwoorden)
+            for token in tokens:
+                if token in wordAppearsIn:
+                    wordAppearsIn[token].append(str(file))
+                else:
+                    wordAppearsIn[token] = [str(file)]
         except IndexError:
             # print("skipped trefwoorden")
             pass
         try:
             vragen = soup.vragen.get_text()
+            tokens = nltk.word_tokenize(vragen)
+            for token in tokens:
+                if token in wordAppearsIn:
+                    wordAppearsIn[token].append(str(file))
+                else:
+                    wordAppearsIn[token] = [str(file)]
         except IndexError:
             # print("skipped vragen")
             pass
         try:
             antwoorden = soup.antwoorden.get_text()
+            tokens = nltk.word_tokenize(antwoorden)
+            for token in tokens:
+                if token in wordAppearsIn:
+                    wordAppearsIn[token].append(str(file))
+                else:
+                    wordAppearsIn[token] = [str(file)]
         except IndexError:
             # print("skipped antwoorden")
             pass
         try:
             rubriek = soup.findAll("item", {"attribuut" : "Rubriek"})[0].get_text()
+            tokens = nltk.word_tokenize(rubriek)
+            for token in tokens:
+                if token in wordAppearsIn:
+                    wordAppearsIn[token].append(str(file))
+                else:
+                    wordAppearsIn[token] = [str(file)]
         except IndexError:
             # print("skipped rubriek")
             pass
@@ -97,7 +142,7 @@ def main():
         data[file] = [bestMinistry, bib, inhoud, trefwoorden, vragen, antwoorden, rubriek]
 
     classCount = classFreqCounter(data, classes)
-    print("Calculated frequencies for all classes.")
+    print("\nCalculated frequencies for all classes.")
     totalFiles = len(os.listdir(directory)) + CLASSSMOOTHING
     priorProbs = np.divide(np.array(classCount), totalFiles)
     print("Calculated prior probabilities for all classes.")
@@ -110,11 +155,14 @@ def main():
     conditionalProbs = getConProb(tokenClassCounts, vocabulary, classes)
     print("Calculated conditional probabilities.")
     with open('trained_data.pik', 'wb') as f:
-        pickle.dump([vocabulary, priorProbs, conditionalProbs], f, -1)
+        pickle.dump([vocabulary, priorProbs, conditionalProbs, wordAppearsIn, filesInClass, parsedFiles], f, -1)
         print("wrote data to trained_data.pik.")
 
 
 def getConProb(tct, vocabulary, classes):
+    """
+    Calculate the conditional probabilities for every word in every class.
+    """
     conditionalProbs = {}
     wordsInClass = [sum(item) for item in zip(*tct.values())]
     # print(wordsInClass)
@@ -129,6 +177,9 @@ def getConProb(tct, vocabulary, classes):
 
 
 def getTokenClassCounts(vocabulary, classStrings):
+    """
+    Counts the occurences of each term in every class
+    """
     tct = {}
     for word in vocabulary:
         tct[word] = [0] * len(classStrings)
@@ -140,6 +191,9 @@ def getTokenClassCounts(vocabulary, classStrings):
 
 
 def getclassStrings(data, classes):
+    """
+    Concatenates all text in one class to one string.
+    """
     classStrings = [""] * 16
     for key in data.keys():
         for i, docClass in enumerate(classes):
@@ -149,7 +203,11 @@ def getclassStrings(data, classes):
                 break
     return classStrings
     
+
 def classFreqCounter(data, classes):
+    """
+    Counts the frequencies terms for every class
+    """
     classCounts = [0] * 16
     for key in data.keys():
         for i, classy in enumerate(classes):
@@ -201,13 +259,16 @@ def getBestMatch(foundMinistry, classes):
 
 
 def getVocabulary(classStrings):
+    """
+    "Gets the vocabulary from all text"
+    """
     datasetString = ''.join(classStrings)
     vocabulary = set(nltk.word_tokenize(datasetString))
     return vocabulary
             
 if __name__ == '__main__':
     """
-    classifies all documents as one of 11 ministries
+    Trains naive bayes on the kamervragen dataset.
     """
     main()
     print("DONE!")
