@@ -38,33 +38,37 @@ def main():
     totalClassified = 0
     correctClassified = 0
     voc, priorProbs, condProbs, wordAppearsIn, filesInClass, parsedFiles = readData(TRAINEDDATA)
-    # filenames = os.listdir(DIRECTORY)
-    # for file in filenames:
-    #     # print("======================")
-    #     sys.stdout.flush()
-    #     sys.stdout.write("\r{0}".format("files classified: " + str(totalClassified)))
-    #     documentTokens, correctMinistry = readDocument(file)
-    #     if documentTokens == "not readable":
-    #         continue
-    #     for word in documentTokens:
-    #         if not word in voc:
-    #             documentTokens.remove(word)
-    #     # print(documentTokens)
-    #     classScores = scoreDocument(documentTokens, priorProbs, condProbs)
-    #     # print("geclassificeerd als: " + str(CLASSES[classScores.index(max(classScores))]))
-    #     if correctMinistry == CLASSES[classScores.index(max(classScores))]:
-    #         correctClassified += 1
-    #     totalClassified += 1
-    mutualProbs = {}
-    county = 0
-    print(len(voc))
-    for word in voc:
-        sys.stdout.write("\r{0}".format("Words done: " + str(county)))
+    filenames = os.listdir(DIRECTORY)
+    for file in filenames:
+        # print("======================")
         sys.stdout.flush()
-        county += 1
-        mutualProbs[word] = [0] * 16
-        for i in range(16):
-            mutualProbs[word][i] = getMutualInformation(word, wordAppearsIn, filesInClass, parsedFiles, i)
+        sys.stdout.write("\r{0}".format("files classified: " + str(totalClassified)))
+        documentTokens, correctMinistry = readDocument(file)
+        if documentTokens == "not readable":
+            continue
+        for word in documentTokens:
+            if not word in voc:
+                documentTokens.remove(word)
+        # print(documentTokens)
+        classScores = scoreDocument(documentTokens, priorProbs, condProbs)
+        # print("geclassificeerd als: " + str(CLASSES[classScores.index(max(classScores))]))
+        if correctMinistry == CLASSES[classScores.index(max(classScores))]:
+            correctClassified += 1
+        totalClassified += 1
+    # =======================
+    # The following part is commented because it is excruciatingly slow and mostely untested.
+    # =======================
+
+    # mutualProbs = {}
+    # county = 0
+    # print(len(voc))
+    # for word in voc:
+    #     sys.stdout.write("\r{0}".format("Words done: " + str(county)))
+    #     sys.stdout.flush()
+    #     county += 1
+    #     mutualProbs[word] = [0] * 16
+    #     for i in range(16):
+    #         mutualProbs[word][i] = getMutualInformation(word, wordAppearsIn, filesInClass, parsedFiles, i)
 
 
     print("Finished with classification!")
