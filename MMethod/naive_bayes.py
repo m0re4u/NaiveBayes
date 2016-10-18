@@ -120,11 +120,11 @@ if __name__ == '__main__':
     else:
         V, prior, condprob = train(train_data)
 
-    # pr, re, f1 = test(prior, condprob, data, test_data)
-    # print("-------------------")
-    # print(pr)
-    # print(re)
-    # print(f1)
+    pr, re, f1 = test(prior, condprob, data, test_data)
+    print("-------------------")
+    print(pr)
+    print(re)
+    print(f1)
     print("-------------------")
     print("Selecting features..")
     print(fs.get_top(V, train_data, 10))
