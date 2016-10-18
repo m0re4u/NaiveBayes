@@ -42,7 +42,8 @@ def train(pdata):
 
 def test(prior, condprob, pdata, test_data):
     correct = 0
-    res_dict = {}
+    res_dict = {x: {x: 0 for x in ['FN', 'FP', 'TP']} for x in pdata['ministerie'].unique()}
+    print(res_dict)
     for i, row in enumerate(test_data.iterrows()):
         scores = apply(prior, condprob, pdata, row[1])
         winner = max(scores, key=scores.get)
@@ -56,19 +57,8 @@ def test(prior, condprob, pdata, test_data):
         # If correctly assigned
         if winner == row[1]['ministerie']:
             correct += 1
-            if 'TP' not in res_dict[winner]:
-                res_dict[winner]['TP'] = 0
-                print(winner)
             res_dict[winner]['TP'] += 1
         else:
-            if 'FN' not in res_dict[row[1]['ministerie']]:
-                res_dict[row[1]['ministerie']]['FN'] = 0
-            if 'FN' not in res_dict[winner]:
-                res_dict[winner]['FN'] = 0
-            if 'FP' not in res_dict[row[1]['ministerie']]:
-                res_dict[row[1]['ministerie']]['FP'] = 0
-            if 'FP' not in res_dict[winner]:
-                res_dict[winner]['FP'] = 0
             res_dict[row[1]['ministerie']]['FN'] += 1
             res_dict[winner]['FP'] += 1
 
@@ -77,11 +67,12 @@ def test(prior, condprob, pdata, test_data):
     print(res_dict)
     # save results
     for mclass in pdata['ministerie'].unique():
-        pre = res_dict[mclass]['TP'] / res_dict[mclass]['TP'] + res_dict[mclass]['FP']
-        rec = res_dict[mclass]['TP'] / res_dict[mclass]['TP'] + res_dict[mclass]['FN']
+        pre = res_dict[mclass]['TP'] / (res_dict[mclass]['TP'] + res_dict[mclass]['FP'])
+        rec = res_dict[mclass]['TP'] / (res_dict[mclass]['TP'] + res_dict[mclass]['FN'])
         res_dict[mclass]['pre'] = pre
         res_dict[mclass]['rec'] = rec
-        res_dict[mclass]['f1'] = 2 * pre * rec / pre + rec
+        if pre != 0 and rec != 0:
+            res_dict[mclass]['f1'] = 2 * pre * rec / (pre + rec)
     return res_dict
 
 
